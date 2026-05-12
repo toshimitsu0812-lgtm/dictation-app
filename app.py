@@ -31,13 +31,17 @@ with st.sidebar:
     speed = st.slider("読み上げ速度 (%)", -20, 20, 0, step=5)
     rate_str = f"{speed:+d}%"
     
-    repeat_count = st.radio(
+    # 繰り返し回数を1〜3回で選べるように修正
+    repeat_count = st.slider(
         "各文の繰り返し回数",
-        [1, 3],
-        index=0,
+        min_value=1,
+        max_value=3,
+        value=1,
+        step=1,
         help="同じ英文を何回連続で流すか選択してください。"
     )
 
+    # 間隔を1〜15秒で選べるように設定
     interval_sec = st.slider(
         "文の間の間隔 (秒)",
         min_value=1,
@@ -80,7 +84,7 @@ if st.button("音声ファイルを作成", type="primary"):
                         # まず "Number X" を流して1秒あける
                         combined_audio += label_audio + one_sec_silence
                         
-                        # 指定された回数（1回または3回）だけ本文を繰り返し、その後に指定秒数の間隔を置く
+                        # 指定された回数（1〜3回）だけ本文を繰り返し、その後に指定秒数の間隔を置く
                         for _ in range(repeat_count):
                             combined_audio += sentence_audio + custom_silence
 
