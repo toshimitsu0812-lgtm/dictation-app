@@ -4,19 +4,21 @@ import edge_tts
 from pydub import AudioSegment
 import io
 
-# Edge TTSから音声を一括で取得する関数（エラーを避けるためシンプルにしました）
+st.set_page_config(page_title="Dictation Generator", page_icon="🎧")
+
+st.title("Dictation Generator (Edge TTS)")
+st.write("各文の前に『Number X』と読み上げ、指定した回数だけ英文を繰り返します。")
+
 async def get_audio_payload(text, voice, rate="+0%"):
+    """
+    Edge TTSを使用して音声データを取得する非同期関数
+    """
     communicate = edge_tts.Communicate(text, voice, rate=rate)
     audio_data = b""
     async for chunk in communicate.stream():
         if chunk["type"] == "audio":
             audio_data += chunk["data"]
     return audio_data
-
-st.set_page_config(page_title="Dictation Generator", page_icon="🎧")
-
-st.title("Dictation Generator (Edge TTS)")
-st.write("各文の前に『Number X』と読み上げ、1秒おいて英文を流し、最後に10秒の間隔を空けます。")
 
 with st.sidebar:
     st.header("Settings")
@@ -25,8 +27,17 @@ with st.sidebar:
         ["en-US-AvaNeural", "en-US-GuyNeural", "en-GB-SoniaNeural", "en-AU-WilliamNeural"],
         index=0
     )
+    
     speed = st.slider("読み上げ速度 (%)", -20, 20, 0, step=5)
     rate_str = f"{speed:+d}%"
+    
+    # 繰り返し回数の設定を追加
+    repeat_count = st.radio(
+        "各文の繰り返し回数",
+        [1, 3],
+        index=0,
+        help="同じ英文を何回連続で流すか選択してください。"
+    )
 
 texts = []
 for i in range(10):
@@ -57,8 +68,13 @@ if st.button("音声ファイルを作成", type="primary"):
                         sentence_bytes = loop.run_until_complete(get_audio_payload(text, voice_option, rate=rate_str))
                         sentence_audio = AudioSegment.from_file(io.BytesIO(sentence_bytes), format="mp3")
                         
-                        # 3. 結合: [Number X] + [1秒] + [本文] + [10秒]
-                        combined_audio += label_audio + one_sec_silence + sentence_audio + ten_sec_silence
+                        # 3. 結合処理
+                        # まず "Number X" を流して1秒あける
+                        combined_audio += label_audio + one_sec_silence
+                        
+                        # 指定された回数（1回または3回）だけ本文を繰り返す
+                        for _ in range(repeat_count):
+                            combined_audio += sentence_audio + ten_sec_silence
 
                 out_buffer = io.BytesIO()
                 combined_audio.export(out_buffer, format="mp3")
@@ -70,8 +86,8 @@ if st.button("音声ファイルを作成", type="primary"):
                     file_name="dictation_material.mp3",
                     mime="audio/mp3"
                 )
-                st.success("作成が完了しました！")
+                st.success(f"完了しました！（各文 {repeat_count} 回繰り返し）")
                 
             except Exception as e:
                 st.error(f"エラーが発生しました: {e}")
-                st.info("Pythonのバージョンが3.11または3.12であることを確認してください。")
+                st.info("解決しない場合は、Streamlit CloudのメニューからReboot appを試すか、Pythonのバージョンが3.11/3.12であることを確認してください。")
