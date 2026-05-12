@@ -7,7 +7,7 @@ import io
 st.set_page_config(page_title="Dictation Generator", page_icon="🎧")
 
 st.title("Dictation Generator (Edge TTS)")
-st.write("各文の前に『Number X』と読み上げ、指定した回数だけ英文を繰り返します。")
+st.write("各文の前に『Number X』と読み上げ、指定した回数と間隔で英文を繰り返します。")
 
 async def get_audio_payload(text, voice, rate="+0%"):
     """
@@ -31,12 +31,20 @@ with st.sidebar:
     speed = st.slider("読み上げ速度 (%)", -20, 20, 0, step=5)
     rate_str = f"{speed:+d}%"
     
-    # 繰り返し回数の設定を追加
     repeat_count = st.radio(
         "各文の繰り返し回数",
         [1, 3],
         index=0,
         help="同じ英文を何回連続で流すか選択してください。"
+    )
+
+    interval_sec = st.slider(
+        "文の間の間隔 (秒)",
+        min_value=1,
+        max_value=15,
+        value=10,
+        step=1,
+        help="英文の後に何秒間あけるか設定します。"
     )
 
 texts = []
@@ -50,7 +58,8 @@ if st.button("音声ファイルを作成", type="primary"):
     else:
         combined_audio = AudioSegment.empty()
         one_sec_silence = AudioSegment.silent(duration=1000)   # 1秒の無音
-        ten_sec_silence = AudioSegment.silent(duration=10000) # 10秒の無音
+        # ユーザーが指定した秒数分の無音を作成
+        custom_silence = AudioSegment.silent(duration=interval_sec * 1000) 
 
         with st.spinner("高品質な音声を生成して結合しています..."):
             loop = asyncio.new_event_loop()
@@ -68,13 +77,12 @@ if st.button("音声ファイルを作成", type="primary"):
                         sentence_bytes = loop.run_until_complete(get_audio_payload(text, voice_option, rate=rate_str))
                         sentence_audio = AudioSegment.from_file(io.BytesIO(sentence_bytes), format="mp3")
                         
-                        # 3. 結合処理
                         # まず "Number X" を流して1秒あける
                         combined_audio += label_audio + one_sec_silence
                         
-                        # 指定された回数（1回または3回）だけ本文を繰り返す
+                        # 指定された回数（1回または3回）だけ本文を繰り返し、その後に指定秒数の間隔を置く
                         for _ in range(repeat_count):
-                            combined_audio += sentence_audio + ten_sec_silence
+                            combined_audio += sentence_audio + custom_silence
 
                 out_buffer = io.BytesIO()
                 combined_audio.export(out_buffer, format="mp3")
@@ -86,7 +94,7 @@ if st.button("音声ファイルを作成", type="primary"):
                     file_name="dictation_material.mp3",
                     mime="audio/mp3"
                 )
-                st.success(f"完了しました！（各文 {repeat_count} 回繰り返し）")
+                st.success(f"完了しました！（各文 {repeat_count} 回繰り返し / 間隔 {interval_sec} 秒）")
                 
             except Exception as e:
                 st.error(f"エラーが発生しました: {e}")
